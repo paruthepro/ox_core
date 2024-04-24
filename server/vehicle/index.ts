@@ -78,10 +78,11 @@ export async function CreateVehicle(
     : 0;
 
   if (!coords || !DoesEntityExist(entity)) return;
-  if (!data.vin && (data.owner || data.group)) data.vin = await OxVehicle.generateVin(data as any);
+  if (!data.vin && (data.owner || data.group)) data.vin = await OxVehicle.generateVin(vehicleData);
   if (data.vin && !data.owner && !data.group) delete data.vin;
 
-  data.plate = data.plate && (await IsPlateAvailable(data.plate)) ? data.plate : await OxVehicle.generatePlate();
+  data.plate =
+    data.plate && (!data.id || (await IsPlateAvailable(data.plate))) ? data.plate : await OxVehicle.generatePlate();
 
   const metadata = data.data || ({} as { properties: VehicleProperties; [key: string]: any });
   metadata.properties = metadata.properties || data.properties;
