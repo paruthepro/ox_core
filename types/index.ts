@@ -29,6 +29,7 @@ export interface PlayerMetadata {
   gender: string;
   dateOfBirth: string;
   phoneNumber: string;
+  activeGroup?: string;
   [key: string]: any;
 }
 
@@ -120,9 +121,19 @@ export interface OxAccount {
   role: 'contributor' | 'manager' | 'owner';
 }
 
-export interface OxGroup {
+export interface DbGroup {
   name: string;
   label: string;
-  grades: [null, ...string[]];
+  grades: string[];
+  type?: string;
+  colour?: number;
+}
+
+export interface OxGroup extends DbGroup {
+  grades: string[];
   principal: string;
+}
+
+export interface OxGroupPermissions {
+  [grade: string]: { [permission: string]: boolean };
 }

@@ -101,7 +101,7 @@ async function OnPlayerDeath() {
   const coords = GetEntityCoords(cache.ped, true);
   const health = Math.floor(Math.max(100, GetEntityMaxHealth(cache.ped) * 0.8));
 
-  NetworkResurrectLocalPlayer(coords[0], coords[1], coords[2], GetEntityHeading(cache.ped), false, false);
+  NetworkResurrectLocalPlayer(coords[0], coords[1], coords[2], GetEntityHeading(cache.ped), 0, false);
 
   if (cache.vehicle) SetPedIntoVehicle(cache.ped, cache.vehicle, cache.seat);
 
@@ -114,6 +114,6 @@ on('ox:playerLoaded', () => {
   const id: CitizenTimer = setInterval(() => {
     if (!OxPlayer.isLoaded) return clearInterval(id);
 
-    if (!playerIsDead && IsPedDeadOrDying(cache.ped, true)) OnPlayerDeath();
+    if (!playerIsDead && IsPedDeadOrDying(PlayerPedId(), true)) OnPlayerDeath();
   }, 200);
 });

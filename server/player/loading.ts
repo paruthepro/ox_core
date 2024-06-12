@@ -1,13 +1,15 @@
-import { OxPlayer } from 'player/class';
+import { OxPlayer, PlayerInstance } from 'player/class';
 import { CreateUser, GetUserIdFromIdentifier } from './db';
 import { GetIdentifiers, GetPlayerLicense } from 'utils';
 import { DEBUG, SV_LAN } from '../config';
 import type { Dict } from 'types';
 
-const connectingPlayers: Dict<OxPlayer> = {};
+const connectingPlayers: Dict<PlayerInstance> = {};
 
 /** Loads existing data for the player, or inserts new data into the database. */
 async function loadPlayer(playerId: number) {
+  if (serverLockdown) return serverLockdown;
+
   const player = new OxPlayer(playerId);
   const license = SV_LAN ? 'fayoum' : GetPlayerLicense(playerId);
 
@@ -29,10 +31,6 @@ async function loadPlayer(playerId: number) {
   player.username = GetPlayerName(player.source as string);
   player.userId = userId ? userId : await CreateUser(player.username, GetIdentifiers(playerId));
   player.identifier = identifier;
-
-  if (serverLockdown) return serverLockdown;
-
-  if (!OxPlayer.add(playerId, player)) return;
 
   DEV: console.info(`Loaded player data for OxPlayer<${player.userId}>`);
 
@@ -69,12 +67,17 @@ on('playerConnecting', async (username: string, _: any, deferrals: any) => {
 });
 
 on('playerJoining', async (tempId: string) => {
-  connectingPlayers[source] = connectingPlayers[tempId];
-  delete connectingPlayers[tempId];
-
-  DEV: console.info(`Assigned id ${source} to OxPlayer<${connectingPlayers[source].userId}>`);
-
   if (serverLockdown) return DropPlayer(source.toString(), serverLockdown);
+
+  const player = connectingPlayers[tempId];
+
+  if (!player) return;
+
+  delete connectingPlayers[tempId];
+  connectingPlayers[source] = player;
+  player.source = source;
+
+  DEV: console.info(`Assigned id ${source} to OxPlayer<${player.userId}>`);
 });
 
 onNet('ox:playerJoined', async () => {
@@ -84,9 +87,7 @@ onNet('ox:playerJoined', async () => {
 
   if (!(player instanceof OxPlayer)) return DropPlayer(playerSrc.toString(), player || `Failed to load player.`);
 
-  DEV: console.info(`Starting character selection for OxPlayer<${player.userId}>`);
-
-  player.setAsJoined(playerSrc);
+  player.setAsJoined();
 });
 
 on('playerDropped', () => {
@@ -94,7 +95,7 @@ on('playerDropped', () => {
 
   if (!player) return;
 
-  player.logout(true);
+  player.logout(true, true);
   OxPlayer.remove(player.source);
 
   DEV: console.info(`Dropped OxPlayer<${player.userId}>`);

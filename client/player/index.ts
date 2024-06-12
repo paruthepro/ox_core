@@ -1,13 +1,14 @@
 import { netEvent } from 'utils';
-import type { Character, Dict, OxStatus } from 'types';
+import type { Character, Dict, OxGroup, OxStatus } from 'types';
+import { GetGroupPermissions } from '../../common';
 
 export const Statuses: Dict<OxStatus> = {};
 const callableMethods: Dict<true> = {};
 
-export const OxPlayer = new (class PlayerSingleton {
+class PlayerSingleton {
   userId: number;
-  charId: number;
-  stateId: string;
+  charId?: number;
+  stateId?: string;
   #isLoaded: boolean;
   #groups: Dict<number>;
   #statuses: Dict<number>;
@@ -105,6 +106,41 @@ export const OxPlayer = new (class PlayerSingleton {
     return this.#metadata[key];
   }
 
+  getGroup(filter: string): number;
+  getGroup(filter: string[] | Record<string, number>): [string, number] | [];
+  getGroup(filter: string | string[] | Record<string, number>) {
+    if (typeof filter === 'string') {
+      return this.#groups[filter];
+    }
+
+    if (Array.isArray(filter)) {
+      for (const name of filter) {
+        const grade = this.#groups[name];
+        if (grade) return [name, grade];
+      }
+    } else if (typeof filter === 'object') {
+      for (const [name, requiredGrade] of Object.entries(filter)) {
+        const grade = this.#groups[name];
+        if (grade && (requiredGrade as number) <= grade) {
+          return [name, grade];
+        }
+      }
+    }
+  }
+
+  getGroupByType(type: string) {
+    const groupNames: string[] = GlobalState.groups;
+    const groups = groupNames.reduce((acc, groupName) => {
+      const group: OxGroup = GlobalState[`group.${groupName}`];
+
+      if (group.type === type) acc.push(groupName);
+
+      return acc;
+    }, [] as string[]);
+
+    return this.getGroup(groups);
+  }
+
   getGroups() {
     return this.#groups;
   }
@@ -118,26 +154,50 @@ export const OxPlayer = new (class PlayerSingleton {
   }
 
   setStatus(name: string, value: number) {
-    if (!this.#statuses[name]) return false;
+    if (this.#statuses[name] === undefined) return false;
 
     this.#statuses[name] = value;
     return true;
   }
 
   addStatus(name: string, value: number) {
-    if (!this.#statuses[name]) return false;
+    if (this.#statuses[name] === undefined) return false;
 
     this.#statuses[name] += value;
     return true;
   }
 
   removeStatus(name: string, value: number) {
-    if (!this.#statuses[name]) return false;
+    if (this.#statuses[name] === undefined) return false;
 
     this.#statuses[name] -= value;
     return true;
   }
-})();
+
+  hasPermission(permission: string): boolean {
+    const matchResult = permission.match(/^group\.([^.]+)\.(.*)/);
+    const groupName = matchResult?.[1];
+    permission = matchResult?.[2] ?? permission;
+
+    if (groupName) {
+      const grade = this.#groups[groupName];
+
+      if (!grade) return false;
+
+      const permissions = GetGroupPermissions(groupName);
+
+      for (let g = grade; g > 0; g--) {
+        const value = permissions[g] && permissions[g][permission];
+
+        if (value !== undefined) return value;
+      }
+    }
+
+    return false;
+  }
+}
+
+export const OxPlayer = new PlayerSingleton();
 
 import './spawn';
 import './death';

@@ -30,22 +30,14 @@ AddStateBagChangeHandler('initVehicle', '', async (bagName: string, key: string,
 
   if (!entity) return;
 
-  for (let index = -1; index < 1; index++) {
-    const ped = GetPedInVehicleSeat(entity, index);
-
-    if (ped && ped !== cache.ped && NetworkGetEntityOwner(ped) === cache.playerId) DeleteEntity(ped);
-  }
-
   await waitFor(async () => {
     if (!IsEntityWaitingForWorldCollision(entity)) return true;
   });
 
   if (NetworkGetEntityOwner(entity) !== cache.playerId) return;
 
-  const vehicleState = Entity(entity).state;
-
   SetVehicleOnGroundProperly(entity);
-  setTimeout(() => vehicleState.set(key, null, true));
+  setTimeout(() => Entity(entity).state.set(key, null, true));
 });
 
 AddStateBagChangeHandler('vehicleProperties', '', async (bagName: string, key: string, value: any) => {
@@ -60,12 +52,7 @@ AddStateBagChangeHandler('vehicleProperties', '', async (bagName: string, key: s
 
   if (!entity) return;
 
-  if (NetworkGetEntityOwner(entity) !== cache.playerId)
-    return DEBUG && console.info(`Cannot set ${key} - player does not own ${bagName}`);
-
-  const vehicleState = Entity(entity).state;
-
-  setVehicleProperties(entity, value);
-
-  setTimeout(() => vehicleState.set(key, null, true));
+  if (setVehicleProperties(entity, value)) {
+    setTimeout(() => Entity(entity).state.set(key, null, true));
+  }
 });

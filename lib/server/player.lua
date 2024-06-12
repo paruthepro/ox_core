@@ -41,6 +41,24 @@ function OxPlayer:getState()
     return Player(self.source).state;
 end
 
+function OxPlayer:getGroup(filter)
+    local result = OxPlayer.__call(self, 'getGroup', filter)
+
+    if type(result) == 'table' then
+        return table.unpack(result)
+    end
+
+    return result
+end
+
+function OxPlayer:getGroupByType(type)
+    local result = OxPlayer.__call(self, 'getGroupByType', type)
+
+    if result then
+        return table.unpack(result)
+    end
+end
+
 for method in pairs(exports.ox_core:GetPlayerCalls() or {}) do
     if not rawget(OxPlayer, method) then OxPlayer[method] = OxPlayer.__call end
 end
@@ -65,8 +83,8 @@ end
 function Ox.GetPlayers(filter)
     local players = exports.ox_core:GetPlayers(filter)
 
-    for id, player in pairs(players) do
-        players[id] = CreatePlayerInstance(player)
+    for i = 1, #players do
+        players[i] = CreatePlayerInstance(players[i])
     end
 
     return players
