@@ -1,6 +1,6 @@
 import { Connection, GetConnection, db } from 'db';
 import { OxPlayer } from 'player/class';
-import type { OxAccount } from 'types';
+import type { OxAccount, OxAccountAccess } from 'types';
 import locales from '../../common/locales';
 import { getRandomInt } from '@overextended/ox_lib';
 
@@ -15,10 +15,10 @@ async function GenerateAccountId(conn: Connection) {
   const date = new Date();
   const year = date.getFullYear().toString().slice(-2);
   const month = ('0' + (date.getMonth() + 1)).slice(-2);
-  const baseId = Number(year + month) * 1e5;
+  const baseId = Number(year + month) * 1e3;
 
   while (true) {
-    const accountId = getRandomInt(1, 3) * 1e9 + baseId + getRandomInt(0, 99999);
+    const accountId = getRandomInt(10, 99) * 1e7 + baseId + getRandomInt(0, 9999);
     const existingId = await conn.scalar<number>(doesAccountExist, [accountId]);
 
     if (!existingId) return accountId;
@@ -115,8 +115,8 @@ export async function SelectAccount(id: number) {
 }
 
 export async function SelectAllAccounts(id: number) {
-  return await db.execute<OxAccount>(
-    'SELECT ac.role, a.* FROM `accounts_access` ac LEFT JOIN accounts a ON a.id = ac.accountId WHERE ac.charId = ?',
+  return await db.execute<OxAccountAccess>(
+    'SELECT a.*, ac.canView, ac.canDeposit, ac.canWithdraw FROM `accounts_access` ac LEFT JOIN accounts a ON a.id = ac.accountId WHERE ac.charId = ?',
     [id]
   );
 }
@@ -147,13 +147,14 @@ export async function CreateNewAccount(
 }
 
 export function DeleteAccount(accountId: number) {
-  return db.update(`DELETE FROM accounts WHERE id = ?`, [accountId]);
+  return db.update(`UPDATE accounts SET \`type\` = 'inactive' WHERE id = ?`, [accountId]);
 }
 
-const selectAccountRole = `SELECT role FROM accounts_access WHERE accountId = ? AND charId = ?`;
-
-export function SelectAccountRole(accountId: number, charId: number) {
-  return db.column<OxAccount['role']>(selectAccountRole, [accountId, charId]);
+export function GetAccountPermission(accountId: number, charId: number, permission: string) {
+  return db.column<boolean>(`SELECT ${permission} FROM accounts_access WHERE accountId = ? AND charId = ?`, [
+    accountId,
+    charId,
+  ]);
 }
 
 export async function DepositMoney(
@@ -172,13 +173,17 @@ export async function DepositMoney(
   if (amount > money) return 'insufficient_funds';
 
   using conn = await GetConnection();
+
+  const hasAccess = await conn.scalar<boolean>(
+    `SELECT canDeposit FROM accounts_access WHERE accountId = ? AND charId = ?`,
+    [accountId, charId]
+  );
+
+  if (!hasAccess) return 'no_access';
+
   const balance = await conn.scalar<number>(getBalance, [accountId]);
 
   if (balance === null) return 'no_balance';
-
-  const role = await conn.scalar<string>(selectAccountRole, [accountId, charId]);
-
-  if (role !== 'owner') return 'no_access';
 
   await conn.beginTransaction();
 
@@ -216,9 +221,12 @@ export async function WithdrawMoney(
 
   using conn = await GetConnection();
 
-  const role = await conn.scalar<string>(selectAccountRole, [accountId, charId]);
+  const hasAccess = await conn.scalar<boolean>(
+    `SELECT canWithdraw FROM accounts_access WHERE accountId = ? AND charId = ?`,
+    [accountId, charId]
+  );
 
-  if (role !== 'owner' && role !== 'manager') return 'no_access';
+  if (!hasAccess) return 'no_access';
 
   const balance = await conn.scalar<number>(getBalance, [accountId]);
 
@@ -247,11 +255,11 @@ export async function WithdrawMoney(
   return true;
 }
 
-export function UpdateAccountAccess(accountId: number, id: number, role?: string) {
-  if (!role) return db.update(`DELETE FROM accounts_access WHERE accountId = ? AND charId = ?`, [accountId, id]);
+export function UpdateAccountAccess(accountId: number, id: number, permission?: string, value?: boolean) {
+  if (!permission) return db.update(`DELETE FROM accounts_access WHERE accountId = ? AND charId = ?`, [accountId, id]);
 
   return db.update(
-    `INSERT INTO accounts_access (accountId, charId, role) VALUE (?, ?, ?) ON DUPLICATE KEY UPDATE role = VALUES(role)`,
-    [accountId, id, role]
+    `INSERT INTO accounts_access (accountId, charId, ${permission}) VALUE (?, ?, ?) ON DUPLICATE KEY UPDATE ${permission} = VALUES(${permission})`,
+    [accountId, id, value]
   );
 }

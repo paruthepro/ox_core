@@ -30,7 +30,6 @@ export interface PlayerMetadata {
   dateOfBirth: string;
   phoneNumber: string;
   activeGroup?: string;
-  [key: string]: any;
 }
 
 export interface CharacterLicense {
@@ -118,7 +117,12 @@ export interface OxAccount {
   owner?: number;
   group?: string;
   type: 'personal' | 'shared' | 'group';
-  role: 'contributor' | 'manager' | 'owner';
+}
+
+export interface OxAccountAccess extends OxAccount {
+  canView: boolean;
+  canDeposit: boolean;
+  canWithdraw: boolean;
 }
 
 export interface DbGroup {

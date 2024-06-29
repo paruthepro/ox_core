@@ -150,16 +150,18 @@ CREATE TABLE IF NOT EXISTS `accounts` (
   `group` VARCHAR(20) NULL,
   `balance` INT DEFAULT 0 NOT NULL,
   `isDefault` TINYINT (1) DEFAULT 0 NOT NULL,
-  `type` ENUM ('personal', 'shared', 'group') DEFAULT 'personal' NOT NULL,
+  `type` ENUM ('personal', 'shared', 'group', 'inactive') DEFAULT 'personal' NOT NULL,
   PRIMARY KEY (`id`),
-  CONSTRAINT `accounts_owner_fk` FOREIGN KEY (`owner`) REFERENCES `characters` (`charId`) ON DELETE CASCADE ON UPDATE CASCADE,
-  CONSTRAINT `accounts_group_fk` FOREIGN KEY (`group`) REFERENCES `ox_groups` (`name`) ON DELETE CASCADE ON UPDATE CASCADE
+  CONSTRAINT `accounts_owner_fk` FOREIGN KEY (`owner`) REFERENCES `characters` (`charId`) ON UPDATE SET NULL ON DELETE SET NULL,
+  CONSTRAINT `accounts_group_fk` FOREIGN KEY (`group`) REFERENCES `ox_groups` (`name`) ON UPDATE SET NULL ON DELETE SET NULL
 );
 
 CREATE TABLE IF NOT EXISTS `accounts_access` (
   `accountId` INT UNSIGNED NOT NULL,
   `charId` INT UNSIGNED NOT NULL,
-  `role` ENUM ('contributor', 'manager', 'owner') NOT NULL,
+  `canView` TINYINT(1) NOT NULL DEFAULT '1',
+  `canDeposit` TINYINT(1) NOT NULL DEFAULT '0',
+  `canWithdraw` TINYINT(1) NOT NULL DEFAULT '0',
   PRIMARY KEY (`accountId`, `charId`),
   CONSTRAINT `accounts_access_accountId_fk` FOREIGN KEY (`accountId`) REFERENCES `accounts` (`id`) ON DELETE CASCADE ON UPDATE CASCADE,
   CONSTRAINT `accounts_access_charId_fk` FOREIGN KEY (`charId`) REFERENCES `characters` (`charId`) ON DELETE CASCADE ON UPDATE CASCADE
